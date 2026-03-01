@@ -654,12 +654,8 @@ function resolveTaskIdx(pkg,taskId){for(var i=0;i<pkg.tasks.length;i++){if(pkg.t
 function resolveTaskById(c,taskId){for(var pi=0;pi<c.phases.length;pi++){var ph=c.phases[pi];for(var pai=0;pai<ph.packages.length;pai++){var pk=ph.packages[pai];for(var ti=0;ti<pk.tasks.length;ti++){if(pk.tasks[ti]._id===taskId)return{pi:pi,pai:pai,ti:ti,task:pk.tasks[ti]};}}}return null;}
 
 // M-2: Extracted from renderTasks() â package header block
+// No-op: kept for call-site compatibility; status management now exclusively uses setTaskStatus()
 function rebuildStates(c){
-  var ns={};
-  c.phases.forEach(function(p,pi){p.packages.forEach(function(pk,pai){pk.tasks.forEach(function(t,ti){
-    if(t.status&&t.status!=="Offen")ns[pi+"-"+pai+"-"+ti]=t.status;
-  });});});
-  c.states=ns;
 }
 // findOldStateKey - DEPRECATED (M-1: status now on task.status)
 function findOldStateKey(c,pi,pai,ti,t){return null;}

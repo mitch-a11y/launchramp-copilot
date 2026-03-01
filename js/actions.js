@@ -31,3 +31,25 @@ function applySelectedChanges(changes) {
         // Keep behavior otherwise unchanged
     });
 }
+
+// Status cycle array
+var SC=['Offen','In Arbeit','Warte auf Kunde','Erledigt'];
+
+// Cycle task status to next value (called from rendered task rows)
+function cycle(id){
+  var c=getActiveClient();
+  var r=resolveTaskById(c,id);
+  if(!r)return;
+  var cur=r.task.status||'Offen';
+  setTaskStatus(c,r.pi,r.pai,r.ti,SC[(SC.indexOf(cur)+1)%SC.length]);
+  save();renderAll();
+}
+
+// Set task status to specific value (called from rendered task rows)
+function setSt(id,v){
+  var c=getActiveClient();
+  var r=resolveTaskById(c,id);
+  if(!r)return;
+  setTaskStatus(c,r.pi,r.pai,r.ti,v);
+  save();renderAll();
+}
