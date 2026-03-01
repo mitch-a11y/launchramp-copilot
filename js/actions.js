@@ -30,4 +30,6 @@ function applySelectedChanges(changes) {
         }
         // Keep behavior otherwise unchanged
     });
+    saveNow();
+    renderAll();
 }
