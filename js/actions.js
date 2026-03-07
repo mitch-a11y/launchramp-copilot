@@ -1637,10 +1637,13 @@ function computeDiff(importData) {
             if (it.t !== undefined && it.t !== ct.t) changes.push({ type: "rename_task", severity: "green", task: ct.t, _id: ct._id, newName: it.t, _task: ct });
             if (it.notes !== undefined && it.notes !== ct.notes) changes.push({ type: "notes_change", severity: "green", task: ct.t, _id: ct._id, oldNotes: ct.notes, newNotes: it.notes, _task: ct });
             if (it.min !== undefined && it.min !== ct.min) changes.push({ type: "effort_change", severity: "green", task: ct.t, _id: ct._id, oldMin: ct.min, newMin: it.min, _task: ct });
+            if (it.vor !== undefined && it.vor !== ct.vor) changes.push({ type: "dependency_change", severity: "yellow", task: ct.t, _id: ct._id, oldVor: ct.vor, newVor: it.vor, _task: ct });
           });
           cpk.tasks.forEach(function(ct) { var still = ipk.tasks.find(function(t) { return t._id === ct._id; }); if (!still) changes.push({ type: "delete_task", severity: "red", task: ct.t, _id: ct._id, phase: cph.name, package: cpk.name, _pkg: cpk }); });
         });
+        cph.packages.forEach(function(cpk) { var still = iph.packages.find(function(pk) { return pk._id === cpk._id; }); if (!still) changes.push({ type: "delete_package", severity: "red", package: cpk.name, phase: cph.name, _phase: cph, _id: cpk._id }); });
       });
+      cp.phases.forEach(function(cph) { var still = ip.phases.find(function(ph) { return ph._id === cph._id; }); if (!still) changes.push({ type: "delete_phase", severity: "red", phase: cph.name, project: cp.name, _project: cp, _id: cph._id }); });
     });
   });
   return changes;
@@ -1663,6 +1666,7 @@ function applySelectedChanges() {
     else if (c.type === "rename_task" && c._task) { c._task.t = c.newName; applied++; }
     else if (c.type === "notes_change" && c._task) { c._task.notes = c.newNotes; applied++; }
     else if (c.type === "effort_change" && c._task) { c._task.min = c.newMin; applied++; }
+    else if (c.type === "dependency_change" && c._task) { c._task.vor = c.newVor; applied++; }
     else if (c.type === "new_task") {
       var ic = window._pendingImport.data.clients.find(function(x) { return DB.clients.find(function(cc) { return cc._id === x._id; }); });
       if (ic) { var cc = DB.clients.find(function(x) { return x._id === ic._id; });
@@ -1680,6 +1684,8 @@ function applySelectedChanges() {
     else if (c.type === "new_phase" && c._project && c.data) { var np = JSON.parse(JSON.stringify(c.data)); np._id = np._id || genId("ph"); np.packages = (np.packages || []).map(function(pk) { pk._id = pk._id || genId("pk"); pk.tasks = (pk.tasks || []).map(function(t) { t._id = t._id || genId("t"); t.status = t.status || "Offen"; return t; }); return pk; }); c._project.phases.push(np); applied++; }
     else if (c.type === "new_package" && c._phase && c.data) { var npk = JSON.parse(JSON.stringify(c.data)); npk._id = npk._id || genId("pk"); npk.tasks = (npk.tasks || []).map(function(t) { t._id = t._id || genId("t"); t.status = t.status || "Offen"; return t; }); c._phase.packages.push(npk); applied++; }
     else if (c.type === "delete_task" && c._pkg && c._id) { var dti = c._pkg.tasks.findIndex(function(t) { return t._id === c._id; }); if (dti >= 0) { c._pkg.tasks.splice(dti, 1); applied++; } }
+    else if (c.type === "delete_package" && c._phase && c._id) { var dpi = c._phase.packages.findIndex(function(pk) { return pk._id === c._id; }); if (dpi >= 0) { c._phase.packages.splice(dpi, 1); applied++; } }
+    else if (c.type === "delete_phase" && c._project && c._id) { var dphi = c._project.phases.findIndex(function(ph) { return ph._id === c._id; }); if (dphi >= 0) { c._project.phases.splice(dphi, 1); applied++; } }
   });
   Bus.emit('data:changed'); closeModal("diffModal");
   var notifs = generateNotifications(changes, indices);

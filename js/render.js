@@ -663,7 +663,7 @@ function renderDiffReview(changes) {
   h += "<p>" + changes.length + " Änderungen: " + greens.length + " 🟢  " + yellows.length + " 🟡  " + reds.length + " 🔴</p>";
   if (greens.length) h += "<button onclick=\"checkAllGreen()\" class=\"btn btn-sm\" style=\"margin-bottom:1rem\">✅ Alle Grünen annehmen</button>";
   function row(c, i) {
-    var chk = c.severity === "green" ? "checked" : "";
+    var chk = (c.severity === "green" || c.type === "new_task" || c.type === "new_package") ? "checked" : "";
     var icon = c.severity === "green" ? "🟢" : c.severity === "yellow" ? "🟡" : "🔴";
     var desc = "";
     if (c.type === "status_change") desc = icon + " <b>" + esc(c.task) + "</b> — " + esc(c.oldStatus) + " → " + esc(c.newStatus);
@@ -676,7 +676,10 @@ function renderDiffReview(changes) {
     else if (c.type === "new_package") desc = icon + " NEUES PACKAGE: <b>" + esc(c.data.name) + "</b> → " + esc(c.phase);
     else if (c.type === "new_phase") desc = icon + " NEUE PHASE: <b>" + esc(c.data.name) + "</b>";
     else if (c.type === "rename_phase") desc = icon + " Phase: " + esc(c.phase) + " → " + esc(c.newName);
+    else if (c.type === "dependency_change") desc = icon + " <b>" + esc(c.task) + "</b> — Vorgänger: " + (c.oldVor||"–") + " → " + (c.newVor||"–");
     else if (c.type === "delete_task") desc = icon + " LÖSCHEN: <b>" + esc(c.task) + "</b> (" + esc(c.phase) + ")";
+    else if (c.type === "delete_package") desc = icon + " PACKAGE LÖSCHEN: <b>" + esc(c["package"]) + "</b> (" + esc(c.phase) + ")";
+    else if (c.type === "delete_phase") desc = icon + " PHASE LÖSCHEN: <b>" + esc(c.phase) + "</b>";
     else if (c.type === "new_client") desc = icon + " NEUER KUNDE: <b>" + esc(c.data.name) + "</b>";
     else if (c.type === "new_project") desc = icon + " NEUES PROJEKT: <b>" + esc(c.data.name) + "</b>";
     else desc = icon + " " + c.type;
