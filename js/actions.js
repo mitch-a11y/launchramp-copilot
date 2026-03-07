@@ -271,7 +271,7 @@ function mkProject(name,tpl,categories){
   }else{
     phases=defaultPhases();
   }
-  const proj={id,name,type:tpl||'launch',phases,states:{},docLinks:{},jfNotes:'',
+  const proj={id,name,type:tpl||'launch',phases,docLinks:{},jfNotes:'',
     quickLinks:{homepage:'',instagram:'',linkedin:'',gdrive:'',claude:''},
     timeLog:[],activeTimer:null,
     startDate:new Date().toISOString().split('T')[0],launchDate:futDate(60),
@@ -460,8 +460,6 @@ function confirmNewProject(clientId,btn){
       proj.id='p'+Date.now()+'_'+Math.random().toString(36).substr(2,4);
       proj.name=name;
       proj.completed=false;
-      // Reset all states
-      proj.states={};
     }else{
       proj=mkProject(name,tpl==='launch'?'webinar':tpl,categories);
     }
@@ -490,7 +488,7 @@ function duplicateRetainer(projId){
   const nextMonth=(curMonth+1)%12;
   const year=nextMonth===0?new Date().getFullYear()+1:new Date().getFullYear();
   newProj.name='Retainer '+months[nextMonth]+' '+year;
-  newProj.states={};newProj.completed=false;
+  newProj.completed=false;
   newProj.startDate=new Date().toISOString().split('T')[0];
   newProj.launchDate=futDate(30);
   // Reset phase dates
@@ -533,7 +531,6 @@ function toggleClientExpand(id,e){
 }
 function delClient(id,e){
   pushUndo('Kunde gelÃ¶scht');e.stopPropagation();if(DB.clients.length<=1)return toast('Mind. 1 Kunde');if(!confirm('Kunde und alle Projekte lÃ¶schen?'))return;DB.clients=DB.clients.filter(c=>c.id!==id);if(DB.activeClient===id){DB.activeClient=DB.clients[0].id;const ap=DB.clients[0].projects[0];DB.activeProject=ap?ap.id:null}Bus.emit('data:changed');toast('GelÃ¶scht')}function renameClientInline(cid){const cl=DB.clients.find(x=>x.id===cid);if(!cl)return;const nn=prompt('Kundenname:',cl.name);if(!nn||!nn.trim())return;cl.name=nn.trim();Bus.emit('data:changed');}
-  pushUndo('Kunde gel\u00f6scht');
 
 function delProject(clientId,projId,e){
   pushUndo('Projekt gel\u00f6scht');
@@ -598,7 +595,6 @@ function addCustomLink(){
 function editTitle(){const s=document.getElementById('clientTitle'),i=document.getElementById('clientTitleInput');i.value=getActiveClient().name;s.style.display='none';i.style.display='inline-block';i.focus();i.select()}
 function saveTitle(){
   pushUndo('Titel gespeichert');const s=document.getElementById('clientTitle'),i=document.getElementById('clientTitleInput'),v=i.value.trim()||'Projekt';s.style.display='';i.style.display='none';getActiveClient().name=v;Bus.emit('data:changed');}
-  pushUndo('Titel gespeichert');
 
 function setProjectStart(val){
   pushUndo('Startdatum gesetzt');
@@ -832,11 +828,9 @@ if(typeof pi==="string"){var _pi=resolvePhaseIdx(c,pi);var _pai=resolvePkgIdx(c.
 
 const SC=['Offen','In Arbeit','Warte auf Kunde','Erledigt'];
 function cycle(id){
-  pushUndo('Status geÃ¤ndert');const c=getActiveClient();var r=resolveTaskById(c,id);if(!r){dbg("cycle: task not found",id);return;}var task=r.task;var cur=task.status||"Offen";const nxt=SC[(SC.indexOf(cur)+1)%SC.length];task.status=nxt;if(c.states)c.states[r.pi+"-"+r.pai+"-"+r.ti]=nxt;Bus.emit('data:changed');logActivity("status_change",{task:id,oldStatus:cur,newStatus:nxt})}
-  pushUndo('Status ge\u00e4ndert');
+  pushUndo('Status geÃ¤ndert');const c=getActiveClient();var r=resolveTaskById(c,id);if(!r){dbg("cycle: task not found",id);return;}var task=r.task;var cur=task.status||"Offen";const nxt=SC[(SC.indexOf(cur)+1)%SC.length];task.status=nxt;Bus.emit('data:changed');logActivity("status_change",{task:id,oldStatus:cur,newStatus:nxt})}
 function setSt(id,v){
-  pushUndo('Status gesetzt');var c=getActiveClient();var r=resolveTaskById(c,id);if(!r){dbg("setSt: task not found",id);return;}var task=r.task;var old=task.status||"Offen";task.status=v;if(c.states)c.states[r.pi+"-"+r.pai+"-"+r.ti]=v;Bus.emit('data:changed');logActivity("status_change",{task:id,oldStatus:old,newStatus:v})}
-  pushUndo('Status gesetzt');
+  pushUndo('Status gesetzt');var c=getActiveClient();var r=resolveTaskById(c,id);if(!r){dbg("setSt: task not found",id);return;}var task=r.task;var old=task.status||"Offen";task.status=v;Bus.emit('data:changed');logActivity("status_change",{task:id,oldStatus:old,newStatus:v})}
 function setOwner(pi,pai,ti,sel){
   pushUndo('Owner ge\u00e4ndert');
   const c=getActiveClient();
@@ -1182,10 +1176,8 @@ let curDocId=null;
 function editLink(id,name){curDocId=id;document.getElementById('linkName').textContent=name;document.getElementById('linkUrl').value=getActiveClient().docLinks[id]||'';openModal('linkModal')}
 function saveLink(){
   pushUndo('Dok-Link gespeichert');if(!curDocId)return;const u=document.getElementById('linkUrl').value.trim();if(u)getActiveClient().docLinks[curDocId]=u;save();closeModal('linkModal');renderDocs();toast('Link gespeichert')}
-  pushUndo('Dok-Link gespeichert');
 function removeLink(){
   pushUndo('Dok-Link entfernt');if(!curDocId)return;delete getActiveClient().docLinks[curDocId];save();closeModal('linkModal');renderDocs()}
-  pushUndo('Dok-Link entfernt');
 function openDocLink(id){const u=getActiveClient().docLinks[id];if(u)window.open(u,'_blank');else toast('Noch kein Link konfiguriert')}
 
 // ============================================================
@@ -1594,6 +1586,8 @@ function handleImportFile(input) {
     try {
       var importData = JSON.parse(e.target.result);
       if (!importData.clients || !importData.clients.length) { document.getElementById("importStatus").innerHTML = "<p style=\"color:var(--red)\">â UngÃ¼ltige Datei: Kein clients-Array gefunden.</p>"; return; }
+      var snapIdx = DB.clients.findIndex(function(c) { return c._id === importData.clients[0]._id; });
+      if (snapIdx >= 0) createSnapshot(snapIdx, "Auto-Backup vor Import");
       var changes = computeDiff(importData);
       if (changes.length === 0) { document.getElementById("importStatus").innerHTML = "<p style=\"color:var(--green)\">â Keine Ãnderungen erkannt. Der Stand ist identisch.</p>"; return; }
       window._pendingImport = { data: importData, changes: changes };
@@ -1627,11 +1621,11 @@ function computeDiff(importData) {
       if (!cp) { changes.push({ type: "new_project", severity: "red", client: cc.name, data: ip }); return; }
       (ip.phases || []).forEach(function(iph) {
         var cph = cp.phases.find(function(ph) { return ph._id === iph._id; });
-        if (!cph) { changes.push({ type: "new_phase", severity: "red", project: cp.name, data: iph }); return; }
+        if (!cph) { changes.push({ type: "new_phase", severity: "red", project: cp.name, data: iph, _project: cp }); return; }
         if (iph.name !== cph.name) changes.push({ type: "rename_phase", severity: "yellow", phase: cph.name, newName: iph.name, _ref: cph });
         (iph.packages || []).forEach(function(ipk) {
           var cpk = cph.packages.find(function(pk) { return pk._id === ipk._id; });
-          if (!cpk) { changes.push({ type: "new_package", severity: "yellow", phase: cph.name, data: ipk }); return; }
+          if (!cpk) { changes.push({ type: "new_package", severity: "yellow", phase: cph.name, data: ipk, _phase: cph }); return; }
           (ipk.tasks || []).forEach(function(it) {
             var ct = cpk.tasks.find(function(t) { return t._id === it._id; });
             if (!ct) { changes.push({ type: "new_task", severity: "yellow", phase: cph.name, package: cpk.name, data: it }); return; }
@@ -1644,7 +1638,7 @@ function computeDiff(importData) {
             if (it.notes !== undefined && it.notes !== ct.notes) changes.push({ type: "notes_change", severity: "green", task: ct.t, _id: ct._id, oldNotes: ct.notes, newNotes: it.notes, _task: ct });
             if (it.min !== undefined && it.min !== ct.min) changes.push({ type: "effort_change", severity: "green", task: ct.t, _id: ct._id, oldMin: ct.min, newMin: it.min, _task: ct });
           });
-          cpk.tasks.forEach(function(ct) { var still = ipk.tasks.find(function(t) { return t._id === ct._id; }); if (!still) changes.push({ type: "delete_task", severity: "red", task: ct.t, _id: ct._id, phase: cph.name, package: cpk.name }); });
+          cpk.tasks.forEach(function(ct) { var still = ipk.tasks.find(function(t) { return t._id === ct._id; }); if (!still) changes.push({ type: "delete_task", severity: "red", task: ct.t, _id: ct._id, phase: cph.name, package: cpk.name, _pkg: cpk }); });
         });
       });
     });
@@ -1663,7 +1657,7 @@ function applySelectedChanges() {
   var applied = 0;
   indices.forEach(function(i) {
     var c = changes[i]; if (!c) return;
-    if (c.type === "status_change" && c._project && c._stKey) { if (!c._project.states) c._project.states = {}; c._project.states[c._stKey] = c.newStatus; var _pts=c._stKey.split("-");if(c._project.phases[_pts[0]]&&c._project.phases[_pts[0]].packages[_pts[1]]&&c._project.phases[_pts[0]].packages[_pts[1]].tasks[_pts[2]]){c._project.phases[_pts[0]].packages[_pts[1]].tasks[_pts[2]].status=c.newStatus;} applied++; }
+    if (c.type === "status_change" && c._project && c._stKey) { var _pts=c._stKey.split("-");if(c._project.phases[_pts[0]]&&c._project.phases[_pts[0]].packages[_pts[1]]&&c._project.phases[_pts[0]].packages[_pts[1]].tasks[_pts[2]]){c._project.phases[_pts[0]].packages[_pts[1]].tasks[_pts[2]].status=c.newStatus;} applied++; }
     else if (c.type === "deadline_change" && c._task) { c._task.due = c.newDeadline; applied++; }
     else if (c.type === "owner_change" && c._task) { c._task.owner = c.newOwner; applied++; }
     else if (c.type === "rename_task" && c._task) { c._task.t = c.newName; applied++; }
@@ -1682,6 +1676,10 @@ function applySelectedChanges() {
         });
       }
     }
+    else if (c.type === "rename_phase" && c._ref) { c._ref.name = c.newName; applied++; }
+    else if (c.type === "new_phase" && c._project && c.data) { var np = JSON.parse(JSON.stringify(c.data)); np._id = np._id || genId("ph"); np.packages = (np.packages || []).map(function(pk) { pk._id = pk._id || genId("pk"); pk.tasks = (pk.tasks || []).map(function(t) { t._id = t._id || genId("t"); t.status = t.status || "Offen"; return t; }); return pk; }); c._project.phases.push(np); applied++; }
+    else if (c.type === "new_package" && c._phase && c.data) { var npk = JSON.parse(JSON.stringify(c.data)); npk._id = npk._id || genId("pk"); npk.tasks = (npk.tasks || []).map(function(t) { t._id = t._id || genId("t"); t.status = t.status || "Offen"; return t; }); c._phase.packages.push(npk); applied++; }
+    else if (c.type === "delete_task" && c._pkg && c._id) { var dti = c._pkg.tasks.findIndex(function(t) { return t._id === c._id; }); if (dti >= 0) { c._pkg.tasks.splice(dti, 1); applied++; } }
   });
   Bus.emit('data:changed'); closeModal("diffModal");
   var notifs = generateNotifications(changes, indices);

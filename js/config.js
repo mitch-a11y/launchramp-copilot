@@ -655,11 +655,7 @@ function resolveTaskById(c,taskId){for(var pi=0;pi<c.phases.length;pi++){var ph=
 
 // M-2: Extracted from renderTasks() â package header block
 function rebuildStates(c){
-  var ns={};
-  c.phases.forEach(function(p,pi){p.packages.forEach(function(pk,pai){pk.tasks.forEach(function(t,ti){
-    if(t.status&&t.status!=="Offen")ns[pi+"-"+pai+"-"+ti]=t.status;
-  });});});
-  c.states=ns;
+  /* legacy no-op – status lives on task.status only (Phase 1.1) */
 }
 // findOldStateKey - DEPRECATED (M-1: status now on task.status)
 function findOldStateKey(c,pi,pai,ti,t){return null;}
