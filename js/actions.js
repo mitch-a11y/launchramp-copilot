@@ -1649,6 +1649,7 @@ function computeDiff(importData) {
   return changes;
 }
 function checkAllGreen() { document.querySelectorAll("#diffModal .diff-green input[type=checkbox]").forEach(function(cb) { cb.checked = true; }); }
+function genId(prefix) { return prefix + "_" + Math.random().toString(36).substring(2, 10); }
 function applySelectedChanges() {
   pushUndo('\u00c4nderungen angewendet');
   var checks = document.querySelectorAll("#diffModal input[type=checkbox]:checked");
