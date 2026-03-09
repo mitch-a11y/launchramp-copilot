@@ -640,6 +640,8 @@ function handleSyncConflict(choice){
 // ---------- LOAD FROM SUPABASE (Phase 2.1: Conflict Detection) ----------
 async function loadFromSupabase(){
   if(!sbClient){updateSyncStatus('offline');return}
+  // Restore baseline from localStorage (JS variable resets on page load)
+  if(!lastKnownRemote){try{var stored=localStorage.getItem('lr3_baseline');if(stored)lastKnownRemote=JSON.parse(stored);}catch(ebl){}}
   try{
     var resp=await sbClient.from('app_state').select('data,updated_at').eq('id','main').single();
     if(resp.error){console.warn('[Supabase] Load error:',resp.error);updateSyncStatus('error');return}
