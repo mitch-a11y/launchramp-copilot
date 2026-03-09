@@ -552,56 +552,166 @@ function repairCorruptPhases(){
   });
 }
 
-// ---------- LOAD FROM SUPABASE ----------
+// ---------- SYNC HELPERS (Phase 2.1) ----------
+function applyRemoteData(remoteData){
+  DB.clients=remoteData.clients||[];
+  DB.activeClient=remoteData.activeClient||null;
+  DB.activeProject=remoteData.activeProject||null;
+  // Run migrations on remote data
+  DB.clients.forEach(function(c){
+    if(!c.projects)c.projects=[];
+    c.projects.forEach(function(proj){
+      if(!proj.startDate)proj.startDate=proj.phases[0]?.startDate||new Date().toISOString().split('T')[0];
+      if(!proj.quickLinks)proj.quickLinks={homepage:'',instagram:'',linkedin:'',gdrive:'',claude:''};
+      if(!proj.jourfix)proj.jourfix={};
+      if(!proj.timeLog)proj.timeLog=[];
+      if(!proj.activeTimer)proj.activeTimer=null;
+      if(proj.completed===undefined)proj.completed=false;
+      proj.phases.forEach(function(p){if(!p.startDate)p.startDate='';if(!p.endDate)p.endDate='';});
+    });
+  });
+  if(!DB.clients.length){var c=mkClientWithProject('Beispiel-Kunde','launch');DB.clients.push(c);DB.activeClient=c.id;DB.activeProject=c.projects[0].id;}
+  DB.clients.forEach(function(c){c.projects.forEach(function(proj){migrateStatesToTasks(proj);});});
+  repairCorruptPhases();
+  localStorage.setItem('lr3',JSON.stringify(DB));
+}
+
+function finalizeSyncLoad(){
+  lastKnownRemote=deepClone({clients:DB.clients,activeClient:DB.activeClient,activeProject:DB.activeProject});
+  try{localStorage.setItem('lr3_baseline',JSON.stringify(lastKnownRemote));}catch(ebl){}
+  isOnline=true;
+  updateSyncStatus('synced');
+  if(DB.activeClient)expandedClients.add(DB.activeClient);
+  renderAll();
+  setupRealtimeSubscription();
+  setupActivitySubscription();
+  ensureActor();
+}
+
+function showSyncConflictModal(localData,remoteData){
+  var m=document.createElement('div');m.className='modal-overlay';m.id='syncConflictOverlay';
+  m.innerHTML='<div class="modal" style="max-width:460px">'
+    +'<h3 style="margin:0 0 2px">\u26A0\uFE0F Sync-Konflikt erkannt</h3>'
+    +'<div class="modal-subtitle">Lokale und Cloud-Daten haben sich beide ge\u00E4ndert seit deinem letzten Besuch.</div>'
+    +'<div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">'
+    +'<button class="btn-primary" onclick="handleSyncConflict(\'remote\')" style="justify-content:flex-start;gap:8px">\u2601\uFE0F Cloud-Version \u00FCbernehmen</button>'
+    +'<button class="btn-primary" onclick="handleSyncConflict(\'local\')" style="justify-content:flex-start;gap:8px;background:var(--accent2,#6c5ce7)">\uD83D\uDCBE Lokale Version behalten</button>'
+    +'<button class="btn-primary" onclick="handleSyncConflict(\'merge\')" style="justify-content:flex-start;gap:8px;background:var(--success,#00b894)">\uD83D\uDD04 Zusammenf\u00FChren (empfohlen)</button>'
+    +'</div>'
+    +'</div>';
+  // Store data for handler
+  m._localData=localData;
+  m._remoteData=remoteData;
+  document.body.appendChild(m);
+}
+
+function handleSyncConflict(choice){
+  var overlay=document.getElementById('syncConflictOverlay');
+  if(!overlay)return;
+  var localData=overlay._localData;
+  var remoteData=overlay._remoteData;
+  overlay.remove();
+
+  if(choice==='remote'){
+    dbg('[Supabase] Conflict resolved: using remote');
+    applyRemoteData(remoteData);
+    finalizeSyncLoad();
+    toast('Cloud-Version \u00FCbernommen');
+  } else if(choice==='local'){
+    dbg('[Supabase] Conflict resolved: keeping local');
+    saveToSupabaseDirect().then(function(){
+      finalizeSyncLoad();
+      toast('Lokale Version beibehalten');
+    });
+  } else if(choice==='merge'){
+    dbg('[Supabase] Conflict resolved: merging');
+    var mergedClients=mergeClients(localData.clients,remoteData.clients,lastKnownRemote?lastKnownRemote.clients:[]);
+    DB.clients=mergedClients;
+    DB.activeClient=localData.activeClient||remoteData.activeClient||null;
+    DB.activeProject=localData.activeProject||remoteData.activeProject||null;
+    localStorage.setItem('lr3',JSON.stringify(DB));
+    saveToSupabaseDirect().then(function(){
+      finalizeSyncLoad();
+      toast('Daten zusammengef\u00FChrt');
+    });
+  }
+}
+
+// ---------- LOAD FROM SUPABASE (Phase 2.1: Conflict Detection) ----------
 async function loadFromSupabase(){
   if(!sbClient){updateSyncStatus('offline');return}
   try{
-    const{data,error}=await sbClient.from('app_state').select('data,updated_at').eq('id','main').single();
-    if(error){console.warn('[Supabase] Load error:',error);updateSyncStatus('error');return}
-    if(data&&data.data&&data.data.clients&&data.data.clients.length>0){
-      const remoteStr=JSON.stringify(data.data);
-      const localStr=JSON.stringify({clients:DB.clients,activeClient:DB.activeClient,activeProject:DB.activeProject});
-      if(remoteStr!==localStr){
-        dbg('[Supabase] Remote data loaded, updating local');
-        lastRemoteUpdate=data.updated_at;
-        DB.clients=data.data.clients||[];
-        DB.activeClient=data.data.activeClient||null;
-        DB.activeProject=data.data.activeProject||null;
-        // Run migrations
-        DB.clients.forEach(c=>{
-          if(!c.projects)c.projects=[];
-          c.projects.forEach(proj=>{
-            if(!proj.startDate)proj.startDate=proj.phases[0]?.startDate||new Date().toISOString().split('T')[0];
-            if(!proj.quickLinks)proj.quickLinks={homepage:'',instagram:'',linkedin:'',gdrive:'',claude:''};
-            if(!proj.jourfix)proj.jourfix={};
-            if(!proj.timeLog)proj.timeLog=[];
-            if(!proj.activeTimer)proj.activeTimer=null;
-            if(proj.completed===undefined)proj.completed=false;
-            proj.phases.forEach(p=>{if(!p.startDate)p.startDate='';if(!p.endDate)p.endDate=''});
-          });
-        });
-        if(!DB.clients.length){const c=mkClientWithProject('Beispiel-Kunde','launch');DB.clients.push(c);DB.activeClient=c.id;DB.activeProject=c.projects[0].id;}
-        // M-1: Migrate states to task.status after Supabase load
-      DB.clients.forEach(function(c){c.projects.forEach(function(proj){migrateStatesToTasks(proj);});});
-        repairCorruptPhases(); // M-2: Fix corrupt phases from broken load period
-      localStorage.setItem('lr3',JSON.stringify(DB));
-        if(DB.activeClient)expandedClients.add(DB.activeClient);
-        renderAll();
-      }
-      // Store baseline for future merge
-      lastKnownRemote = deepClone({clients:DB.clients,activeClient:DB.activeClient,activeProject:DB.activeProject});
-        try{localStorage.setItem("lr3_baseline",JSON.stringify(lastKnownRemote));}catch(ebl){} // S-2
-    } else if(DB.clients.length>0){
+    var resp=await sbClient.from('app_state').select('data,updated_at').eq('id','main').single();
+    if(resp.error){console.warn('[Supabase] Load error:',resp.error);updateSyncStatus('error');return}
+
+    var remote=resp.data&&resp.data.data?resp.data.data:null;
+    var hasRemote=remote&&remote.clients&&remote.clients.length>0;
+    var hasLocal=DB.clients&&DB.clients.length>0;
+
+    // CASE A: Remote leer, local hat Daten → Push local hoch
+    if(!hasRemote&&hasLocal){
       dbg('[Supabase] Remote empty, pushing local data');
-      lastKnownRemote = deepClone({clients:DB.clients,activeClient:DB.activeClient,activeProject:DB.activeProject});
-        try{localStorage.setItem("lr3_baseline",JSON.stringify(lastKnownRemote));}catch(ebl){} // S-2
       await saveToSupabaseDirect();
+      finalizeSyncLoad();
+      return;
     }
-    isOnline=true;
-    updateSyncStatus('synced');
-    setupRealtimeSubscription();
-    setupActivitySubscription();
-    ensureActor();
+
+    // CASE B: Beides leer → nur Subscriptions starten
+    if(!hasRemote&&!hasLocal){
+      dbg('[Supabase] Both empty, starting subscriptions');
+      finalizeSyncLoad();
+      return;
+    }
+
+    // Ab hier: Remote hat Daten
+    if(resp.data.updated_at)lastRemoteUpdate=resp.data.updated_at;
+    var localData={clients:DB.clients,activeClient:DB.activeClient,activeProject:DB.activeProject};
+    var remoteStr=JSON.stringify(remote);
+    var localStr=JSON.stringify(localData);
+
+    // CASE C: Identisch → Baseline setzen, fertig
+    if(remoteStr===localStr){
+      dbg('[Supabase] Local and remote identical');
+      finalizeSyncLoad();
+      return;
+    }
+
+    // Daten unterschiedlich — Conflict Detection via Baseline
+    var baseStr=lastKnownRemote?JSON.stringify(lastKnownRemote):null;
+
+    // CASE D1: Kein Baseline → Remote übernehmen (Erstinstallation / Cache gelöscht)
+    if(!baseStr){
+      dbg('[Supabase] No baseline, accepting remote');
+      applyRemoteData(remote);
+      finalizeSyncLoad();
+      return;
+    }
+
+    var localChanged=(localStr!==baseStr);
+    var remoteChanged=(remoteStr!==baseStr);
+
+    // CASE D2: Nur Remote geändert → Remote übernehmen
+    if(remoteChanged&&!localChanged){
+      dbg('[Supabase] Only remote changed, accepting remote');
+      applyRemoteData(remote);
+      finalizeSyncLoad();
+      return;
+    }
+
+    // CASE D3: Nur Local geändert → Local behalten, hochpushen
+    if(localChanged&&!remoteChanged){
+      dbg('[Supabase] Only local changed, pushing to Supabase');
+      await saveToSupabaseDirect();
+      finalizeSyncLoad();
+      return;
+    }
+
+    // CASE D4: BEIDE geändert → Konflikt-Modal
+    dbg('[Supabase] CONFLICT: both local and remote changed');
+    updateSyncStatus('conflict');
+    showSyncConflictModal(localData,remote);
+    // finalizeSyncLoad() wird von handleSyncConflict() aufgerufen
+
   }catch(e){console.warn('[Supabase] Load failed:',e);updateSyncStatus('error')}
 }
 

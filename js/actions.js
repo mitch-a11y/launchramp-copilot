@@ -245,8 +245,8 @@ let realtimeChannel=null;
 function updateSyncStatus(status){
   const el=document.getElementById('syncStatus');
   if(!el)return;
-  const icons={synced:'\u2601\uFE0F',syncing:'\uD83D\uDD04',error:'\u274C',offline:'\uD83D\uDCF4'};
-  const tips={synced:'Synchronisiert',syncing:'Synchronisiere...',error:'Sync-Fehler',offline:'Offline-Modus'};
+  const icons={synced:'\u2601\uFE0F',syncing:'\uD83D\uDD04',error:'\u274C',offline:'\uD83D\uDCF4',conflict:'\u26A0\uFE0F'};
+  const tips={synced:'Synchronisiert',syncing:'Synchronisiere...',error:'Sync-Fehler',offline:'Offline-Modus',conflict:'Sync-Konflikt erkannt'};
   el.textContent=icons[status]||'\u2601\uFE0F';
   el.title=tips[status]||status;
 }
